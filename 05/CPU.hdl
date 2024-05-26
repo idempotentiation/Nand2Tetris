@@ -32,5 +32,45 @@ CHIP CPU {
         pc[15];          // Address of next instruction
 
     PARTS:
-    //// Replace this comment with your code.
+    // instruction type
+    Not(in = instruction[15], out = Ainstruction);
+    Not(in = Ainstruction, out = Cinstruction);
+
+    // A register
+    Mux16(a = instruction, b = outALU, sel = Cinstruction, out = inA);
+    Or(a = Ainstruction, b = instruction[5], out = loadA);
+    ARegister(in = inA, load = loadA, out = outA);
+    And16(a = outA, b = true, out[0..14] = addressM);
+
+    // load from A register or RAM
+    And(a = Cinstruction, b = instruction[12], out = loadM);
+    Mux16(a = outA, b = inM, sel = loadM, out = outAM);
+
+    // write to RAM
+    And(a = Cinstruction, b = instruction[3], out = writeM);
+
+    // D register
+    And(a = Cinstruction, b = instruction[4], out = loadD);
+    DRegister(in = outALU, load = loadD, out = outD);
+
+    // ALU
+    ALU(x = outD, y = outAM,
+        zx = instruction[11], nx = instruction[10],
+        zy = instruction[9], ny = instruction[8],
+        f = instruction[7], no = instruction[6],
+        out = outALU,
+        zr = outZr, ng = outNg);
+    And16(a = outALU, b = true, out = outM);
+
+    // PC
+    Or(a = outZr, b = outNg, out = nonpositive);
+    Not(in = nonpositive, out = positive);
+    And(a = positive, b = instruction[0], out = jgt);
+    And(a = outZr, b = instruction[1], out = jeq);
+    And(a = outNg, b = instruction[2], out = jlt);
+    Or(a = jgt, b = jeq, out = jge);
+    Or(a = jge, b = jlt, out = jmp);
+    And(a = Cinstruction, b = jmp, out = loadPC);
+    Not(in = loadPC, out = incPC);
+    PC(in = outA, inc = incPC, load = loadPC, reset = reset, out[0..14] = pc);
 }
